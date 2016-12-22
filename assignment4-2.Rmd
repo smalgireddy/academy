@@ -1,0 +1,68 @@
+---
+title: "assignment4-2"
+author: "santhosh"
+date: "October 28, 2016"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+```{r}
+housing.data <- read.csv("C:\\Users\\sanary\\Downloads\\housing\\housingData.csv", header = , stringsAsFactors = F)
+dim(housing.data)
+head(housing.data)
+summary(housing.data)
+cateogerical.var <- names(housing.data)[which(sapply(housing.data, is.character))]
+numerical.var <- names(housing.data)[which(sapply(housing.data, is.numeric))]
+
+housing.data.sample <- housing.data[,1:ncol(housing.data)-1]
+#from the summary of the data we can say that few columns have missing values and those missing values can be categeroized among categorical and numerical values
+housing.missing.var <- names(housing.data)[which(colSums(sapply(housing.data, is.na)) > 0)]
+
+aggr_plot <- aggr(housing.data, col=c('navyblue','red'), numbers=TRUE, sortVars=TRUE, labels=names(housing.data), cex.axis=.6, gap=4, ylab=c("Histogram of missing data","Pattern"))
+
+housing.cor.numerics <- cor(na.omit(housing.data[,numerical.var], use="everything"))
+corrplot(housing.cor.numerics, method="circle", type="lower", insig = "blank")
+
+# from above corrplot these OverallQual+TotRmsAbvGrd+BsmtHalfBath+FullBath+GarageArea+GarageCars are highly correlated with salesprice compared to other variables
+pairs(housing.data[numerical.var], SalePrice~OverallQual+TotRmsAbvGrd+BsmtHalfBath+FullBath+GarageArea+GarageCars, main = "scatter")
+
+housing.data[cateogerical.var] <- lapply(housing.data[cateogerical.var], as.factor)
+
+levels(housing.data$Alley)
+
+# sales distribution
+ggplot(data=housing.data, aes(x=SalePrice)) + 
+    geom_histogram(color='white', alpha=0.5, fill='blue') +
+    scale_x_continuous(limits = c(min(housing.data$SalePrice),max(housing.data$SalePrice))) +
+    ggtitle('Distribution of Sale Price')
+
+# now we will look at the price distribution by neighborhood wise
+housing.data %>% group_by(Neighborhood) %>% summarize(mean.price = mean(SalePrice)) %>% arrange(desc(mean.price)) %>% ggplot(aes(x = Neighborhood, y = mean.price))+
+  geom_bar(stat = "identity", fill='red', alpha=0.7) +
+    ggtitle('Average Sale Price by Neighborhood')+theme(axis.text.x = element_text(angle = 60))
+# distribution of prices how the price range is changing by nieghborhoodwise
+
+ggplot(housing.data, aes(x=Neighborhood, y=SalePrice)) +
+    geom_jitter(color='red', width=0.7) +
+    geom_violin(fill='blue', alpha=0.6) +
+    ggtitle('Distribution of Sale Price by Neighborhood') +
+    scale_y_continuous(limits = c(min(housing.data$SalePrice),max(housing.data$SalePrice))) + 
+    theme(axis.text.x=element_text(angle=45, hjust=1))
+#finding correlation between categorical values
+housing[,cateogerical.var] <- sapply(housing[,cateogerical.var], as.numeric)
+cor(housing, use="everything")
+corrplot.mixed(cor.complete, method="shade", type="lower", insig = "blank")
+
+col.pred <- c("YearBuilt","YearRemodAdd", "PoolQC", "PoolArea","WoodDeckSF","OpenPorchSF","X1stFlrSF","ExterQual","ExterCond", "YrSold","SaleType")
+qlty.rpart <- rpart(as.factor(PoolQC) ~ .,
+                           data = housing[!is.na(housing$PoolQC),col.pred], 
+                           method = "class", 
+                           na.action=na.omit)
+
+ifelse(housing$PoolQC == 1, "Fa", "Gd")
+housing$PoolQC <- ifelse(housing$PoolQC == 1, "Fa", "Gd")
+housing.data$PoolQC <- housing$PoolQC
+```
+

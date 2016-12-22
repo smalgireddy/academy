@@ -1,0 +1,490 @@
+---
+title: "<center><h2><strong>Assignment2</strong></h2></center>"
+author: "<center><h2><strong>Santhosh</strong></h2></center>"
+date: "<center><h2><strong>`r format(Sys.time(), '%d %B, %Y')`</strong></h2></center>"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+<style> 
+h1, h2, h3, h4, h5, h6 {
+  margin: 10pt 0pt 0pt 0pt;
+  font-family: Cambria;
+  font-weight: bold;
+}
+ 
+/* h1 has a slightly larger top margins 
+   so we re-set that from the other*/
+h1 {
+  margin: 24pt 0pt 0pt 0pt;
+  font-size: 14pt;
+  color: #365F91;
+}
+ 
+ 
+h2 {
+  font-size: 13pt;
+  color: green;
+}
+ 
+h3 {
+  font-size: 11pt;
+  color: #4F81BD;
+}
+ 
+h4 {
+  font-size: 11pt;
+  font-weight: bold;
+  font-style: italic;
+  color: #4F81BD;
+}
+ 
+h5 {
+  font-size: 11pt;
+  font-weight: normal;
+  color: #243F5D;
+}
+ 
+h6 {
+  font-size: 11pt;
+  font-weight: normal;
+  font-style: italic;
+  color: #243F5D;
+}
+ 
+/* The following sections are mostly 
+   unrelated to Word/Libre Office imports */
+tt, code, pre {
+   font-family: 'DejaVu Sans Mono', 'Droid Sans Mono', 'Lucida Console', Consolas, Monaco, monospace;
+   background-color: slategrey;
+}
+ 
+a:visited {
+   color: rgb(50%, 0%, 50%);
+}
+ 
+pre {  
+   margin-top: 0;
+   max-width: 95%;
+   border: 1px solid #ccc;
+   white-space: pre-wrap;
+}
+ 
+pre code {
+   display: block; padding: 0.5em;
+}
+ 
+code.r, code.cpp {
+   background-color: #F8F8F8;
+}
+ 
+blockquote {
+   color:#666666;
+   margin:0;
+   padding-left: 1em;
+   border-left: 0.5em #EEE solid;
+}
+ 
+hr {
+   height: 0px;
+   border-bottom: none;
+   border-top-width: thin;
+   border-top-style: dotted;
+   border-top-color: #999999;
+}
+ 
+@media print {
+   * {
+      background: transparent !important;
+      color: black !important;
+      filter: none !important;
+      -ms-filter: none !important;
+   }
+ 
+   body {
+      font-size:11pt;
+      max-width:100%;
+   }
+ 
+   a, a:visited {
+      text-decoration: underline;
+   }
+ 
+   hr {
+      visibility: hidden;
+      page-break-before: always;
+   }
+ 
+   pre, blockquote {
+      padding-right: 1em;
+      page-break-inside: avoid;
+   }
+ 
+   tr, img {
+      page-break-inside: avoid;
+   }
+ 
+   img {
+      max-width: 100% !important;
+   }
+ 
+   @page {
+      margin-top: 2cm;
+      margin-bottom: 1.5cm;
+      margin-left: 3cm;
+      margin-right: 3cm;
+   }
+ 
+   p, h2, h3 {
+      orphans: 3; widows: 3;
+   }
+ 
+   h2, h3 {
+      page-break-after: avoid;
+   }
+}
+</style>
+
+```{r echo = F, message = F}
+library(asbio)
+library(reshape2)
+library(plyr)
+library(ggplot2)
+library(dplyr)
+library(gridExtra)
+library(robustbase)
+library(outliers)
+library(fitdistrplus)
+library(VIM)
+library(mice)
+library(Amelia)
+library(lattice)
+library(datasets)
+library(scatterplot3d)
+library(rgl)
+library(ggplot2)
+library(ggbiplot)
+library(plyr)
+library(outliers)
+library(HSAUR2)
+```
+# 1
+```{r echo=-c(8)}
+x <- c(3,4,2,1,7,6,5)
+y <- c(4,3,7,6,5,2,1)
+
+condis <- ConDis.matrix(x,y)
+concord <- sum(condis == 1, na.rm = T)# no. of concordant pairs
+discord <- sum(condis == -1, na.rm = T)# no. of discordance pairs
+answer <- c("concord" = concord, "discord" = discord)
+answer
+```
+# 2.a & b
+```{r}
+df <- data.frame(rnorm(500), rbinom(500, 1, 0.5), rexp(500, 1), rchisq(500,df =1))# different distributions
+colnames(df) <- c("a","b","c","d")
+df2 <- melt(df, measure.vars = c("a","b","c","d"))# converting the data to long format
+colnames(df2) <- c("groupVar","value") 
+head(df2)
+attach(df2)
+means = ddply(df2, "groupVar",summarise, grp.mean = mean(value)) # calculating mean of grouped data
+# 2.b plotting the density plot across its distribution
+ggplot(data = df2, aes(x = value, y = ..scaled..,fill =  groupVar, color = groupVar)) + geom_density(alpha = .5) + scale_x_continuous(breaks = seq(-3,3,1), limits = c(-3,3)) + geom_vline( data = means, aes(xintercept=grp.mean, color = groupVar), lwd = 0.5) + ggtitle("density plots of a b c & d distributions")
+detach(df2)
+```
+# function to formatting the date
+```{r}
+sot <- function(v) {
+  #x = list(0)
+  if(grepl("-20[01]+",v)){
+      a <- as.character(as.Date(v, format = "%d-%B-%Y"))
+  }else{
+    a <-as.character(as.Date(v, format = "%d-%b-%y"))
+  }
+}
+```
+# 3.a,b,c,d &e shark Data
+# the data that collected in back 1800 times is far diffrent from the data that collected in recents times as evolution of the data gathering techniques, hence shark data is collected in untidy manner, it impacts the timliness of the data. 
+```{r}
+shark.attacks.data <- read.csv("ISE 5103 GSAF.csv", header = T) # loading shark data
+GSAFdata <- shark.attacks.data %>% filter(Year >= 2000) # 3.b filtering shark data if year >= 2000
+attach(GSAFdata)
+new.date <- sapply(GSAFdata$Date, sot) # 3.cformatting date by calling sot function
+new.date <- as.Date(new.date)
+GSAFdata <- data.frame(GSAFdata,new.date)
+missing.date.percentage <- (sum(is.na(GSAFdata$new.date))/length(GSAFdata$new.date))*100
+missing.date.percentage # 3.d missing date percentage
+GSAFdata <- GSAFdata %>% filter(!is.na(new.date)) # 3.e filter out NA data from new date 
+GSAFdata <- GSAFdata[order(GSAFdata$new.date), ]
+daysBetween <- diff(GSAFdata$new.date) # calculatind time diffrence in days
+daysBetween <- append(daysBetween, 0, 0) # placing 0 at first index
+GSAFdata <- data.frame(GSAFdata,daysBetween)
+```
+# 3.f.1 & 3.f.2
+```{r}
+ggplot(GSAFdata, aes( x = GSAFdata$daysBetween))+geom_histogram(binwidth = 1) + geom_density(alpha = 0.2, fill = 'red')+geom_vline(xintercept = mean(GSAFdata$daysBetween), colour = "red") # days between distribution using histograms
+#the histogrma distribution clearly shows that right skewed and distributed exponentially
+par(mfrow  = c(2,2))
+boxplot(GSAFdata$daysBetween,ylab = "days between shark attacks", xlab = "frequency") # we can see lot of outliers within this plot
+adjbox(GSAFdata$daysBetween,ylab = "days between shark attacks", xlab = "frequency")
+invisible(dev.off())
+# too many outliers are there when we do plot using boxplot, but with adjplot there are few outliers
+```
+# 3.f.3
+#  this function evaluates the each data value of the dataset and returns TRUE if it is outlier FALSE if it is not
+
+```{r}
+grubbs.flag <- function(sample.data) {
+    outliers <- NULL
+    test <- sample.data
+    grubbs.result <- grubbs.test(test)
+    pv <- grubbs.result$p.value
+    while(pv < 0.05) {
+        outliers <- c(outliers,as.numeric(strsplit(grubbs.result$alternative," ")[[1]][3]))
+        test <- sample.data[!sample.data %in% outliers]
+        grubbs.result <- grubbs.test(test)
+        pv <- grubbs.result$p.value
+    }
+    return(data.frame(X=sample.data,Outlier=(sample.data %in% outliers)))
+}
+
+# "ESD function" to evaluate outliers
+  esd.critical <- function(alpha, n, i) {
+      p = 1 - alpha/(2*(n-i+1))
+      t = qt(p,(n-i-1))
+      return(t*(n-i) / sqrt((n-i-1+t**2)*(n-i+1)))
+  }
+
+  removeoutliers = function(y) {
+
+      ## Define values and vectors.
+      y2 = y
+      n = length(y)
+      alpha = 0.05
+      toremove = 0
+
+      ## Compute test statistic until r=10 values have been
+      ## removed from the sample.
+      for (i in 1:10){
+        if(sd(y2)==0) break
+        ares = abs(y2 - mean(y2))/sd(y2)
+        Ri = max(ares)
+        y2 = y2[ares!=Ri]
+
+        ## Compute critical value.
+        if(Ri>esd.critical(alpha,n,i))
+            toremove = i
+      }
+
+      # Values to keep
+      if(toremove>0)
+        y = y[abs(y-mean(y)) < sort(abs(y-mean(y)),decreasing=TRUE)[toremove]]
+
+      return (y)
+}
+```
+# 3.f.3
+```{r}
+grubbs.test(GSAFdata$daysBetween,type=10) # grubbs test
+outliers <- grubbs.flag(GSAFdata$daysBetween) # outliers dataset has data value and status
+outliers.remove <- removeoutliers(GSAFdata$daysBetween)
+# after removing outliers checking for outliers distribution in boxplot
+boxplot(removeoutliers(GSAFdata$daysBetween), ylab = "days between shark attacks", xlab = "frequency")
+adjbox(removeoutliers(GSAFdata$daysBetween), ylab = "days between shark attacks", xlab = "frequency")
+invisible(dev.off())
+```
+# 3.g
+```{r}
+par(mfrow = c(2,2))
+qqnorm(GSAFdata$daysBetween,main="days between shark attacks")
+qqline(GSAFdata$daysBetween, col = 'red3', lwd = 4)
+samp.daysBetween = rpois(1556, lambda=mean(GSAFdata$daysBetween)) # creating distribution sample
+qqplot(GSAFdata$daysBetween, samp.daysBetween, main="exponential Q-Q Plot") # plotting against sample dataa
+# above plot clearly indicates that days are exponentially distributed
+invisible(dev.off())
+```
+# 3.h & 3.i
+```{r}
+plotdist(GSAFdata$daysBetween, histo = T, demp = T)
+par(mfrow=c(2,2))
+fitgamma <- fitdist(GSAFdata$daysBetween+1, "gamma", method = "mle")
+fitlnorm <- fitdist(GSAFdata$daysBetween+1, "lnorm", method = "mle")
+fitexp <- fitdist(GSAFdata$daysBetween+1, "exp", method = "mle")
+
+plot.legend <- c("gamma","lognormal","exp")
+denscomp(list(fitgamma,fitlnorm,fitexp), legendtext = plot.legend)
+qqcomp(list(fitgamma,fitlnorm,fitexp), legendtext = plot.legend)
+cdfcomp(list(fitgamma,fitlnorm,fitexp), legendtext = plot.legend)
+ppcomp(list(fitgamma,fitlnorm,fitexp), legendtext = plot.legend)
+## 3.i
+gofstat(fitexp)
+## from above plots, the daysbetween data fitted to exponential distribution perfectly.probabaility distribution says that the occurunces of shark attacks are descrined by poisson distribution whereas the days interval between attacks is descibed exponential distribution
+```
+# missingness of data
+# 4.a
+```{r warning=F}
+data("freetrade")
+missing.pairs_ft <- md.pairs(freetrade)
+pbox(freetrade, pos = 1, int = F, cex= 1) # it represents the missing dataagainst pos =1 i.e "year"
+scattmatrixMiss(freetrade, selection = "any") # similar to scatterplot notes the missing values
+miss.freetrade <- apply(freetrade, 2, function(x) table(is.na(x))) # tabling missing data
+freetrade.missed <- freetrade[,c("tariff","polity","signed","intresmi", "fiveop")]
+matrixplot(freetrade.missed, interactive = F, sortby = NULL)
+invisible(imp_data <- mice(freetrade.missed, seed = 500)) # multiple imputation using mice
+stripplot(imp_data, pch = 20, cex = 1.4)
+# in the above plot magenta color indicates the missing data whereas blue available data
+#The density of the imputed data for each imputed dataset is showed in magenta while the density of the observed data is showed in blue
+```
+# 4.a
+```{r warning=F} 
+missing_plot <- aggr(freetrade.missed,col=c('green2','red'),numbers=TRUE,bars=T,sortVars=TRUE,labels=names(freetrade.missed), cex.axis=1,gap=3, ylab=c("Missing data","Pattern"))
+head(complete(imp_data)) # by default extracts the first imputed data set from  new imputed data
+mice.fit <- with(imp_data, lm(tariff ~ polity + freetrade$pop + freetrade$gdp.pc)) #fitting the imputed data against real data using regression
+pool(mice.fit)
+freetrade.x <- as.data.frame(abs(is.na(freetrade))) # 0 -> not missing, 1-> missing
+freetrade.na <- freetrade.x[,sapply(freetrade.x, sd) > 0] #checking for NA valued columns
+cor(freetrade[,-c(1,2)], freetrade.na, use = "pairwise.complete.obs")
+#Rows are observed variables, columns are indicator variables for missingness
+## high correlation means the row variables is strongly correlated with missingness of the column variable 
+```
+# 4.b
+```{r}
+chisq.test(freetrade$country, freetrade.na$tariff)
+## from the results the p value is less than 0.05, says that missingness of tariff significantly dependent on the country values by rejecting null hypothesis
+freetrade.remove.nepal <- freetrade %>% filter(!country =="Nepal")
+freetrade.remove.philippines <- freetrade %>% filter(!country =="Philippines")
+freetrade.remove.nepal$tariff <- abs(is.na(freetrade.remove.nepal$tariff)) # 0 -> not missing, 1-> missing
+freetrade.remove.philippines$tariff <- abs(is.na(freetrade.remove.philippines$tariff)) # 0 -> not missing, 1-> missing
+chisq.test(freetrade.remove.nepal$country, freetrade.remove.nepal$tariff)
+# p value is less than 0.05 so we reject the null hypothesis, tariff and country are dependent f we remove nepal
+chisq.test(freetrade.remove.philippines$country, freetrade.remove.philippines$tariff)
+# p value is greater than 0.05 so we failed to reject the null hypothesis, Means tariff and country are independent if we remove philippines 
+# Nepal has mroe NA values unlike Philipines doesnt have any, Hence removal of philipine might effect the overall sampel size but not the no of NA values# where removal of Nepal affects both the NA count and the total sample size. This can be depicted by performing chi square test seperately
+```
+# 5.a Principal COmponent Analysis
+```{r}
+data(mtcars)
+corMat <- cor(mtcars, use = "everything") # correlation matrix to know the dependencies between attributes
+eig.mtcars <- eigen(corMat,symmetric = T) # 5.a.2
+pca.mtcars <- prcomp(mtcars, scale. = T) # 5.a.3
+# 5.b.4 pca values and eigen vectors are same
+c <-summary(pca.mtcars)
+plot(pca.mtcars)# 5.b.5
+screeplot(pca.mtcars, type = "line", npcs = 10, main = "scree plot")
+biplot(pca.mtcars,scale = 0, xlab = "pc1$60%", ylab = "pc2$25%")
+# from the biplot pc1 component explains around 60% of variance of data and pc2 explains 25% of data, and if we take the maseri bora car in the plot this vehicle can be categorised as high end car with max weight and with highest horspower in terms of capacity
+pca.mtcars$rotation[,1] %*% pca.mtcars$rotation[,2]
+## nearly zero, we can say that pc1 and pc2 are orthogonal
+```
+# 5.b Principal COmponent Analysis
+```{r}
+data("heptathlon")
+attach(heptathlon)
+par(mfrow = c(2,4))
+invisible(apply(heptathlon[,1:8],2,hist))
+#apply(heptathlon,2, grubbs.test)
+invisible(dev.off())
+outliers.event <- apply(heptathlon,2, grubbs.test)
+```
+# function to calcualte outliers
+```{r}
+event.outliers = function(b){
+  n <- length(b)
+  outliers <- vector(mode="numeric", length=n-1)
+  match.outliers <- vector(mode="numeric", length=n-1)
+  for (i in 1:(n-1)) {
+   outliers[i] <- c(strsplit(b[[i]]$alternative," ")[[1]][3])
+   match.outliers[i] <- match(outliers[i],heptathlon[[i]])
+    
+  }
+  return(list(outliers,match.outliers))
+}
+```
+# 5.b.2
+```{r}
+outliers.match.index<-event.outliers(outliers.event)
+outliers.match.index
+cat("from above list outliers index list, row number 25 is a frequent outlier, corresponding athletes is Launa(PNG) ")
+heptathlon[25,]
+heptathlon <- heptathlon[-25,]
+```
+# 5.b.3,4,5 & 6
+```{r}
+hurdles.max <- max(heptathlon$hurdles)
+r200.max <- max(heptathlon$run200m)
+r800.max <- max(heptathlon$run800m)
+# transformed data
+heptathlon$hurdles <- hurdles.max-heptathlon$hurdles
+heptathlon$run200m <- r200.max-heptathlon$run200m
+heptathlon$run800m <- r800.max-heptathlon$run800m
+
+# 5.b.4
+Hpca <- prcomp(heptathlon[,-8], scale. = T)
+# 5.b.5
+ggbiplot(Hpca, scale = 0, var.scale = 1,varname.size = 4, labels.size=20, circle = T)+ scale_color_discrete(name = '') + theme(legend.direction = 'horizontal', legend.position = 'top')
+# from the plot pc1 is mainly describes hurdles, longjump and run200m, where as pc2 mainly describes run800m, highjump data
+# PC1 distuiguishes between atheletes who can do higherlongjump, takes less time in hurdles,shots,# run200 events, do good javelin throw with those atheletes who covers smaller lengths in longjump lengths,# takes very long time in hurdles,shots, run200 events, bad javeline throwers.# PC2: distinguishes between athlete who can run800 in less time & reach greater heights in high jump with# athletes who take longer duritonin run800 and can reach lower heights in high jumps
+summary(Hpca)
+# 5.b.6
+plot(heptathlon$score, Hpca$x[, 1])
+hpca.cor <- cor(heptathlon$score, Hpca$x[, 1])
+detach(heptathlon)
+# strong correlation between score and the projection values on the PC1 axis implies that the PC1 is a good indicator of the overall scores assigned to the athletes
+```
+# 5.c.1& 2
+```{r}
+train0 <- read.csv("train.0")
+train1 <- read.csv("train.1")
+train2 <- read.csv("train.2")
+# 5.c.2
+par(mfrow = c(2,3))
+train0.pca <- prcomp(train0) # for training data set 1
+plot(train0.pca, xlab = "pc components")# plots the proportion of variance covered by each pc component
+screeplot(train0.pca, type = "line")
+train1.pca <- prcomp(train1) # for training data set 2
+plot(train1.pca, xlab = "pc components")
+screeplot(train1.pca, type = "line") # to describe major percentage of data we should consider approx 7 PC components
+train2.pca <- prcomp(train2) # for training data set 3
+plot(train2.pca, xlab = "pc components")
+screeplot(train2.pca,  type = "line") # most percentage of the data can be described by taking approx 7 pc componenets
+train2.summary <- summary(train2.pca)
+#  PCA helps in dimension reduction of high dimensional data sets maximum precision ,and also it compresses high resolution imageas by reducing  the attributes of the original image without loosing much data.
+invisible(dev.off())
+```
+# 6.a & b kaggle Dataset : Philadelphia Crime Data
+# Crime Data for Philadelphia, it is extracted from Kaggle
+#url : https://www.kaggle.com/mchirico/philadelphiacrimedata
+#data name : crime.csv
+# this data set includes of the data regarding crime information like crime date, at what hour of day, and place, police district etc.
+```{r}
+
+if(!exists("crime.data")){
+  crime.data <- read.csv("crime.csv", header = T, stringsAsFactors = F)
+}
+attach(crime.data)
+summary(crime.data)
+names(crime.data)
+dim(crime.data) # number of rows and columns in data set
+# splitting the dataset based on the type of crime
+crime.data$type <- ifelse(grepl("Homicide", Text_General_Code, ignore.case = T), "Homicide", 
+               ifelse(grepl("Rape", Text_General_Code, ignore.case = T), "Rape", "Other"))
+detach(crime.data)
+attach(crime.data)
+# subsetting homicide data and rape data
+crime.homicide <- crime.data[crime.data$type == "Homicide",]
+crime.rape <- crime.data[crime.data$type == "Rape",]
+#crimes frequency based in hour of day (24 hours time)
+par(mfrow = c(1,2))
+boxplot(crime.homicide$Hour,ylab = "reported hour in a day", xlab = "frequency")
+boxplot(crime.rape$Hour,ylab = "reported hour in a day", xlab = "frequency")
+# from the barpplots there are no outliers
+grubbs.test(crime.rape$Hour) # grubs test to determine the outliers
+grubbs.test(crime.homicide$Hour)
+ggplot(crime.homicide, aes(x=Hour)) + geom_histogram(aes(y=..density..),binwidth= 3,colour="green", fill="red") +geom_density(alpha=0.6, fill="blue")
+ggplot(crime.rape, aes(x=Hour)) + geom_histogram(aes(y=..density..),binwidth= 3,colour="green", fill="red") +geom_density(alpha=0.6, fill="blue")
+# missingness of data
+apply(crime.data,2, function(x){table(is.na(crime.data$Police_Districts))}) # to summarize the missing values for each column in crime data
+# In the above result TRUE means missing value, FALSE means data is available
+```

@@ -1,0 +1,200 @@
+---
+title: "assignment4"
+author: "santhosh"
+date: "October 6, 2016"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+```{r}
+library(lattice)
+library(car)
+library(EnvStats)
+library(corrplot)
+library(ggbiplot)
+library(mice)
+library(VIM)
+library(MASS) # lda
+library(Amelia) #freettade data
+library(ggplot2)
+library(tidyr)
+library(mlbench)
+library(reshape2)
+#q1.a
+data("Glass")
+head(Glass)
+Glass <- Glass[1:9] # V1 column as serial number it doesnt give any input to the data
+d <- melt(Glass)
+ggplot(d,aes(x = value)) +facet_wrap(~variable,scales = "free_x") + geom_histogram()
+ggplot(d,aes(x = variable,y = value)) + facet_wrap(~variable, scale="free") + geom_boxplot()
+
+
+#q1.b
+symbox(Glass$Fe+1 , data=Glass, powers=c(3,2,1,0,-0.5,-1,-1.087457,-2,-3.500898))
+symbox(Glass$K+1 , data=Glass, powers=c(3,2,1,0.01485945,0,-0.5,-1,-1.047563,-2))
+symbox(Glass$Ca+1 , data=Glass, powers=c(3,2,1,0,-0.5,-1,-2))
+EnvStats::boxcox(Glass$Ca+1,optimize = TRUE, lambda=c(-5,7)) # from the result we can see that at  lambda = -1.087457 ppcc is high 
+EnvStats::boxcox(Glass$K+1,optimize = TRUE, lambda=c(-5,7))# from the result we can see that at   lambda = -1.047563 ppcc is high
+EnvStats::boxcox(Glass$Fe+1,optimize = TRUE, lambda=c(-7,7))# from the result we can see that at  lambda = -3.500898ppcc is high
+rm("Glass")
+# pcA
+#q1.c
+data("Glass")
+Glass <- as.data.frame(apply(Glass,2, as.numeric))
+cormat = cor(Glass)
+corrplot(cormat, method = "color")
+eig_glass <- eigen(cormat)
+glasss_pca <- prcomp(Glass, scale. = T)
+summary(glasss_pca)
+ggbiplot(glasss_pca)
+screeplot(glasss_pca, type = "line", npcs = 10, main = "scree plot")
+#lda -LINEAR DISCRIMINANAT ANALYSIS
+plot(Glass[,-10], col = Glass$Type, pch = Glass$Type)
+glass.lda <- lda(Type ~ RI+Na+Mg+Al+Si+K+Ca+Ba+Fe, data = Glass)
+ggbiplot(glass.lda,circle=T)
+glass.lda.predict <- predict(glass.lda, newdata = Glass[,-11])$class
+table(glass.lda.predict,Glass$Type)
+# 2 questions
+
+data(freetrade)
+# listwise deletion or case-wise deletion or complete case analysis
+# this method is justified if data generation mechanism is MCAR
+#  for MAR,MNAR type data mechanisms, we may loose important data if we use listwise deletion
+
+#2.a
+summary(freetrade)
+freetrade.listwise <- freetrade[complete.cases(freetrade),]
+lm.listwise <- lm(data=freetrade.listwise,tariff ~ year+country+polity+pop+gdp.pc+intresmi+signed+fiveop+usheg)
+summary(lm.listwise)
+symnum(cor(freetrade.listwise[,-c(1,2)]))
+#2.b
+#mean imputation or also called as indicator variable adjustment, it creates bias
+freetrade.x <- as.data.frame(abs(is.na(freetrade))) # 0 -> not missing, 1-> missing
+freetrade.missed <- freetrade[,sapply(freetrade.x, sd) > 0] #checking for NA valued columns
+
+# function
+means.freetrade.missed <- function(x){
+  mean.x <- mean(x, na.rm = T)
+  x[is.na(x)] <- mean.x
+  x
+}
+freetrade.replace.mean <- as.data.frame(apply(freetrade.missed, 2, means.freetrade.missed))
+freetrade.dup <- freetrade
+freetrade.dup$tariff <- freetrade.replace.mean$tariff
+freetrade.dup$polity <- freetrade.replace.mean$polity
+freetrade.dup$intresmi <- freetrade.replace.mean$intresmi
+freetrade.dup$signed <- freetrade.replace.mean$signed
+freetrade.dup$fiveop <- freetrade.replace.mean$fiveop
+lm.freetrade.mean <- lm(data=freetrade.dup,tariff ~ year+country+polity+pop+gdp.pc+intresmi+signed+fiveop+usheg)
+summary(lm.freetrade.mean)
+
+#2.c
+#multiple imputation
+aggr(freetrade, numbers = T, prop = c(T,F))
+freetrade.multiple.imp <- mice(freetrade, method = "cart", print = F) # for mean method it is working
+summary(freetrade.multiple.imp)
+x <- mice::complete(freetrade.multiple.imp,3)
+sum(is.na(x)) # no missing values as we imputed the missing values
+fit<-with(freetrade.multiple.imp, lm(tariff ~ year+country+polity+pop+gdp.pc+intresmi+signed+fiveop+usheg))
+summary(fit)
+summary(pool(fit))
+#freetrade.multiple.imp$predictorMatrix
+#class(freetrade.multiple.imp)
+
+#2.d
+# single imputation
+rm(freetrade)
+data(freetrade)
+# single imputation by linear regression as tariff is higly dependent on gdp.pc
+freetrade$ind <- as.numeric(!is.na(freetrade$tariff))
+lm.imp <- lm(data = freetrade, tariff ~ gdp.pc+pop)
+y <- summary(lm.imp)
+
+for(i in 1:nrow(freetrade)){
+  if(freetrade$ind[i] == 0){
+    freetrade$tariff[i] = (-2.711e-03)* freetrade$gdp.pc[i] + 2.867e-08* freetrade$pop[i] + 3.254e+01
+  }
+}
+
+#hotdeck imputation polity 
+activedataset <- hotdeck(freetrade,variable= c("polity"),ord_var= c("year"),domain_var= c("pop","usheg","country" ),impNA= TRUE )
+freetrade$polity <- activedataset$polity
+#kNN imputation intresmi 
+knn.freetrade <- kNN(freetrade, variable = "intresmi", k =6)
+freetrade$intresmi <- knn.freetrade$intresmi
+# FIVE op mean imputation
+freetrade$fiveop <- freetrade.dup$fiveop <- freetrade.replace.mean$fiveop
+#predctive mean matching signed
+#freetrade$signed <- as.factor(freetrade$signed)
+sign.miss <- is.na(freetrade$signed)
+freetrade$sign.miss <- sign.miss
+#freetrade[!freetrade$sign.miss, "signed"]
+freetrade[sign.miss,"signed"] <- mice.impute.pmm(freetrade$signed, !freetrade$sign.miss, freetrade$gdp.pc)
+lm.single.imp <- lm(data=freetrade,tariff ~ year+country+polity+pop+gdp.pc+intresmi+signed+fiveop+usheg)
+summary(lm.single.imp)
+
+##3.a
+plot.frequency.spectrum <- function(X.k, xlimits=c(0,length(X.k)/2)) {
+  plot.data  <- cbind(0:(length(X.k)-1), Mod(X.k))
+  
+  plot(plot.data, t="h", lwd=2, main="", 
+       xlab="Frequency (Hz)", ylab="Strength", 
+       xlim=xlimits, ylim=c(0,max(Mod(plot.data[,2]))))
+      return (as.data.frame(plot.data))
+}
+
+# 3q.a
+# the given time series data is discrete in the format of time domain data
+# first we need to transform time domain data to discrete frequency domain data
+# from this frequency domain data we can find the amplitude and strength of the data.
+#I am assumin that the strength of the signal should vary with the type of vehicle, hence the type of the vechicle is dependent on the amplitude of the data. even though noise may effect the strength of the signal 
+# from the bridge truck events data the images of the trucks or vehicles is clearly given in time based intervals, If we match the frequency doman data with the the images given in events data based on time intervals. We can anlayze this data using shot analysis window technique to obtain the fft spectrum to classify the vehicles 
+# and also We can match the five point summary data to each class of vehicle as data is discrete data.
+bridge.sensor.data <- read.csv(file.choose(), header = T)
+ # 3b 
+data.acq.freq <- 100
+time.points <- seq(min(bridge.sensor.data$Time), max(bridge.sensor.data$Time), 1/data.acq.freq)
+t <- max(bridge.sensor.data$Time) - min(bridge.sensor.data$Time)
+amp.sensor1 <- max(bridge.sensor.data$Sensor1) - min(bridge.sensor.data$Sensor1)
+#w   <- 2*pi/time
+par(mfrow = c(2,1))
+plot(bridge.sensor.data$Sensor1, type = "l")
+plot(bridge.sensor.data$Sensor2, type = "l")
+dev.off()
+sensor1 <- fft(bridge.sensor.data$Sensor1)
+sensor2 <- fft(bridge.sensor.data$Sensor2)
+
+# amplitude of te signal or data smapling
+amplitude.sensor1 <- plot.frequency.spectrum(sensor1)
+amplitude.sensor2 <-plot.frequency.spectrum(sensor2)
+# the plot has lot of noise between the peaks, and also the peaks represents dominant frequency components which are used to classify vehicles
+colnames(amplitude.sensor1) <- c("seq","amplitude")
+colnames(amplitude.sensor2) <- c("seq","amplitude")
+summary(amplitude.sensor1$amplitude)
+summary(amplitude.sensor2$amplitude)
+# features are energy, zero crossing and fundamental frequency
+# energy per analysis window
+# calcualte total sepectrum energy taking the whole spectrum's analysis window and also calculate the sample spectur's analysis window
+
+#energy function 
+energy <- function(x){
+  return (sum(exp(x)^2)/length(x))
+}
+sensor1.total.energy <- energy(amplitude.sensor1$amplitude)
+chunk <- function(x, n) split(x, sort(rank(x) %% n))
+sample.data.sensor1 <- chunk(amplitude.sensor1$amplitude,283)
+sample.energy.values1 <- sapply(sample.data.sensor1,energy)
+plot(sample.energy.values1, type = "l",xlab = "sample wndows",main = "sensor1 sample window energies")
+# sensor2
+sensor2.total.energy <- energy(amplitude.sensor2$amplitude)
+# sampling window analysis by taking size as 
+sample.data.sensor2 <- chunk(amplitude.sensor2$amplitude,283)
+sample.energy.values2 <- sapply(sample.data.sensor2,energy)
+plot(sample.energy.values2, type = "l", xlab = "sample wndows",main = "sensor2 sample window energies")
+# plotting sample energy values
+# AS we have 2 sensors' data 
+#3c. I struggled to classify the frequency domain ata, my assumption is, we should have sample frequency domain data for each vechicle type. With that basis we can validate the sensor's data.
+```
+

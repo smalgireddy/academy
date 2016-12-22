@@ -1,0 +1,152 @@
+---
+title: "a4q1"
+author: "santhosh"
+date: "October 31, 2016"
+output:
+  word_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(car)
+library(MASS)
+library(jpeg)
+library(ggplot2)
+library(lattice)
+library(dplyr)
+library(data.table)
+library(VIM)
+library(Amelia)
+library(corrplot)
+library(mice)
+library(car)
+library(rpart)
+library(caret)
+library(glmnet)
+library(elasticnet)
+library(knitr)
+library(pls)  #load the plsr package for Partial Least Squares Regression
+library(plotly)
+library(caret)
+
+```
+
+
+
+```{r}
+#1.a
+classDigit <- read.csv("C:\\Users\\sanary\\Desktop\\assignment\\classDigits.csv")
+classDigit.cor <- cor(classDigit[,-1])
+classDigit.cor <- ifelse(is.na(classDigit.cor),0,classDigit.cor)
+classDigit.eigen <- eigen(classDigit.cor)
+classData.eigen.values <- classDigit.eigen$values
+head(classData.eigen.values,10)
+mean.data <- colMeans(classDigit[,-1])
+classDigit.mean.matrix <- matrix(abs(mean.data),28,28, byrow = T)
+writeJPEG(classDigit.mean.matrix,target="FileName.jpg")
+classDigit <- classDigit[,-1]
+classDigit.diff.normalize <- matrix(ncol = ncol(classDigit), nrow = nrow(classDigit))
+#1.b
+for(i in 1 : 30000){ 
+    classDigit.diff.normalize[i,] <- abs(as.numeric(classDigit[i,] - mean.data))
+  }
+#mean.data <<- mean.data
+#y <- apply(classDigit,1, mean.diffrence)
+classDigit.diff.normalize.cor <- cor(classDigit.diff.normalize)
+classDigit.cor.normalize <- ifelse(is.na(classDigit.diff.normalize.cor),0,classDigit.diff.normalize.cor)
+classDigit.eigen.normalize <- eigen(classDigit.cor.normalize)
+
+classDigit.eigen.normalize$vectors
+
+
+classDigit.pca <- prcomp(classDigit, center = T, scale. = F)
+eig <- (classDigit.pca$sdev)^2
+variance <- eig*100/sum(eig)
+cumvar <- cumsum(variance)
+
+classDigit.var <- data.frame(eig = eig, variance = variance,cumvariance = cumvar)
+#1.c
+# weight calculation using mean data
+  weight.calculate <- function(b,n){
+    a <- list(0)  
+    a1 <- classDigit.diff.normalize[b,]
+    for(i in 1:n){
+      a[i] <- a1 %*% classDigit.pca$rotation[,i]
+    }
+    return(a)
+  }
+ #image reconstruction unsig eigen vectors and mean data 
+ image.reconstruct <- function(eigenno, imageno) {
+  list.weights <- weight.calculate(imageno,eigenno)
+  #print(list.weights)
+  recursive.add <- function(x){
+    if (x == 0) return (0)
+    else  return((list.weights[[x]]*classDigit.pca$rotation[,x]) + recursive.add(x-1))
+  }
+   
+  img <- mean.data + recursive.add(eigenno)
+  classDigit.img.matrix <- matrix(abs(img),28,28, byrow = T)
+   writeJPEG(classDigit.img.matrix,target= paste("image",imageno,"-",eigenno,".jpg", sep = ""))
+  return(T)
+ }
+ 
+ images <- c(15,100)
+ eigenvectors <- c(5,20,100)
+ 
+ for(i in seq_along(images)){
+   for(j in seq_along(eigenvectors)){
+    image.reconstruct(eigenvectors[j],images[i]) 
+   }
+ }
+
+ pcaCharts <- function(x) {
+    x.var <- x$sdev ^ 2
+    x.pvar <- x.var/sum(x.var)
+    par(mfrow=c(2,2))
+    plot(x.pvar,xlab="Principal component", ylab="Proportion of variance explained", ylim=c(0,1), type='b')
+    plot(cumsum(x.pvar),xlab="Principal component", ylab="Cumulative Proportion of variance explained", ylim=c(0,1), type='b')
+    screeplot(x)
+    screeplot(x,type="l")
+    par(mfrow=c(1,1))
+}
+pcaCharts(classDigit.pca)
+#mahanalobis
+Class7test <- read.csv("C:\\Users\\sanary\\Desktop\\class7test.csv")
+Class7test <- as.matrix(Class7test[,-c(1,2,787)])
+testspace <- Class7test %*% classDigit.pca$rotation
+pca.numbers <- length(cumvar[which(cumvar < 90)])
+pca.90.matrix <- as.matrix(classDigit.pca$x[,1:pca.numbers])
+
+#1.d
+mahalanobis.distance <- function(n,pca.90.matrix,pca.numbers,testspace){
+  distance.mean <- list(0)
+  for(i in 1:n){
+     d1 <- mahalanobis(pca.90.matrix,testspace[i,1:pca.numbers],cov(pca.90.matrix))
+     distance.mean[i] <- paste(mean(d1)," is mean mahanalobis distance from",i,"th image", sep = "")
+  }
+  return(distance.mean)
+}
+d <- as.character(mahalanobis.distance(7,pca.90.matrix,pca.numbers,testspace))
+
+#1.e
+writeJPEG(matrix(as.numeric(Class7test[4,]), 28, 28, byrow = T), target = "test4.jpeg") #Constructing the test image 4.
+writeJPEG(matrix(as.numeric(Class7test[5,]), 28, 28, byrow = T), target = "test5.jpeg") #Constructing the test image 5.
+writeJPEG(matrix(as.numeric(Class7test[6,]), 28, 28, byrow = T), target = "test6.jpeg") #Constructing the test image 6.
+
+d4k <- mahalanobis(classDigit.pca$x[ ,1:7],testspace[4,1:7],cov(classDigit.pca$x[ ,1:7]))
+d5k <- mahalanobis(classDigit.pca$x[ ,1:92],testspace[5,1:92],cov(classDigit.pca$x[ ,1:92]))# Gives distance of 5 st digit in test file w.r.t all 30000 images in trained file.
+classDigit[which.min(d5k),1] #93-124 5 #
+
+d6k <- mahalanobis(classDigit.pca$x[ ,1:15],testspace[6,1:15],cov(classDigit.pca$x[ ,1:15]))# Gives distance of 6 th digit in test file w.r.t all 30000 images in trained file.
+classDigit[which.min(d6k),1] # We need a minimum value of 15.
+
+
+writeJPEG(matrix(as.numeric(classDigit[which.min(d4k),])/255, 28, 28, byrow = T), target = "check4.jpeg")
+writeJPEG(matrix(as.numeric(classDigit[which.min(d5k),])/255, 28, 28, byrow = T), target = "check5.jpeg")
+writeJPEG(matrix(as.numeric(classDigit[which.min(d6k),])/255, 28, 28, byrow = T), target = "check6.jpeg")
+
+```

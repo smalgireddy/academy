@@ -1,0 +1,120 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
+
+```{r}
+library(data.table)
+library(XLConnect)
+require("cluster")
+require("NbClust")
+require("rgl")
+require("useful")
+
+ILPD.dat <- read.csv('C:\\Users\\sanary\\Desktop\\aa\\Indian Liver Patient Dataset (ILPD).csv')
+
+str(ILPD.dat)
+ILPD.dat[sapply(ILPD.dat, is.factor)] <- lapply(ILPD.dat[sapply(ILPD.dat, is.factor)], 
+                                       as.numeric)
+names(ILPD.dat)
+colnames(ILPD.dat) <- c("age","Gender","TB","DB","Alkphos","Sgpt","Sgot","TP","ALB","AGR","selector")
+class(ILPD.dat)
+
+colnames(ILPD.dat)[colSums(is.na(ILPD.dat)) > 0]
+#  missing values are in AGR column, replace those values wuth the mean of that column///
+ILPD.dat$AGR[which(is.na(ILPD.dat$AGR))] <- mean(ILPD.dat$AGR, na.rm = T)
+ILPD.data.train1 <- ILPD.dat
+ILPD.data.train1$selector <- NULL
+results <- kmeans(ILPD.data.train1, 2)
+table(results$cluster, ILPD.dat$selector)
+plot(ILPD.dat[c("age","Alkphos")], col = results$cluster)
+ILPD.dat.scaled <- scale(ILPD.dat)
+
+wssplot <- function(data, nc=15){                    
+
+  par(mfrow=c(1,2))
+  
+  wss <- NULL  
+  pctExp <-NULL
+  
+  for (k in 1:nc)
+  {
+     kclus <- kmeans(data, centers=k)
+     wss[k] <- kclus$tot.withinss      #store the total within SSE for given k
+     pctExp[k] <- 1-wss[k]/kclus$totss
+  }
+  
+  plot(1:nc, wss, type="b", xlab="Number of Clusters",
+       ylab="Within groups sum of squares")
+
+  plot(1:nc, pctExp, type="b", xlab="Number of Clusters",
+       ylab="Pct Explained")
+  
+  par(mfrow=c(1,1))
+}
+wssplot(ILPD.dat.scaled, 25)
+
+clusFit<-FitKMeans(ILPD.dat.scaled,max.clusters=40,nstart=15)   #evaluates k using the "Hartigan" rule
+clusFit
+PlotHartigan(clusFit)
+
+NbClust(ILPD.dat.scaled,method="kmeans")
+
+#heiractchal clustering
+dist.euc <- dist(ILPD.dat.scaled[,-ncol(ILPD.dat.scaled)], method="euclidean")
+hc <- hclust(dist.euc, method="ward.D2")
+plot(hc, labels=FALSE)
+
+rect.hclust(hc, k=2, border="red")     #if we were to "cut" at k=2, what are the groups?
+ILPD.dat$hcluster <- as.factor(cutree(hc, k=2)) 
+table(ILPD.dat$cmu, ILPD.dat$hcluster)
+#pc
+set.seed(1000)
+pc <- princomp(ILPD.dat.scaled[,-ncol(ILPD.dat.scaled)], cor=TRUE, scores=TRUE)
+
+#we will use 2 clusters for k-means
+ilpd.clu <- kmeans(ILPD.dat.scaled[,-ncol(ILPD.dat.scaled)],2)
+ILPD.dat$cluster <- as.factor(ilpd.clu$cluster)
+head(ILPD.dat)
+plot3d(pc$scores[,1:3], col=ILPD.dat$cluster, main="k-means clusters")
+
+
+
+table(ILPD.dat$selector, ILPD.dat$cluster)
+
+
+#distance
+d<-daisy(ILPD.dat,stand=T)
+
+#different distance functions will produce different results
+
+
+
+dev.off()
+
+
+#look at the different shapes of dendrograms based on the linkage techniques
+
+hclus<-hclust(d,method="single")   #notice the long chains (e.g., very unbalanced)
+plot(hclus)
+
+hclus<-hclust(d,method="complete")
+plot(hclus)
+
+hclus<-hclust(d,method="average")
+plot(hclus)
+
+hclus<-hclust(d,method="ward")  # notice how balanced the clusters are
+plot(hclus)
+
+
+```
+
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).

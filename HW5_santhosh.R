@@ -1,0 +1,247 @@
+library(gbm)
+library(car)
+library(caret)
+library(glmnet)
+library(rpart)
+library(rpart.plot)
+library(ROCR)
+library(dplyr)
+library(randomForest)
+library(e1071)
+library(rattle)
+library(party)
+library(kernlab)
+library(nnet)
+library(devtools)
+library(ggplot2)
+#1.q
+#roc curve
+plotROC <- function(truth, pred){
+  pred_perf <- prediction(pred, truth)    
+  perf <- performance(pred_perf,"tpr","fpr")
+  auc <- performance(pred_perf,"auc")
+  auc <- auc@y.values[[1]]
+  #ks statistic
+  logit_ks <- max(perf@y.values[[1]]-perf@x.values[[1]])
+  p <- which.max(perf@y.values[[1]]-perf@x.values[[1]])
+  x <- seq(1,length(perf@y.values[[1]]), 1)
+  df <- data.frame(x,perf@x.values[[1]],perf@y.values[[1]])
+  names(df) <- c("x","y1","y2")
+  g <- ggplot(df, aes(x))
+  g <- g + geom_line(aes(y=y1), colour="blue")
+  g <- g + geom_line(aes(y=y2), colour="green")
+  g <- g+geom_segment(aes(x = p, y = perf@x.values[[1]][p], xend = p, yend = perf@y.values[[1]][p], color = "segment"))
+  g <- g+ggtitle(paste0("ks distance =", logit_ks))
+  print(g)
+  
+  roc.data <- data.frame(fpr=unlist(perf@x.values),
+                         tpr=unlist(perf@y.values),
+                         model="GLM")
+  r <- ggplot(roc.data, aes(x=fpr, ymin=0, ymax=tpr)) +
+    geom_ribbon(alpha=0.2) +
+    geom_line(aes(y=tpr)) +geom_abline(intercept = 0, slope = 1, color="red", 
+                                       linetype="dashed", size=1.5)
+  r <- r+ggtitle(paste0("ROC Curve w/ AUC=", auc))
+  
+  print(r)
+  #paste(logit_ks,":ks stat value"," ")
+  #
+  paste(auc,":auc value","and",logit_ks,":ks stat value","")
+}
+
+#lift cahrt
+lift.chart <- function(pred){
+  pred_val <-prediction(pred ,test$y)
+  lift.obj <- performance(pred_val, measure="lift", x.measure="rpp")
+  plot(lift.obj, main="Cross-Sell - Lift Chart",xlab="% Populations",ylab="Lift",col="blue")
+  abline(1,0,col="grey")
+}
+#confusion matrix metrics
+conf_metrics <- function(confMat){
+  specificity <- confMat$byClass["Specificity"] # proportion of true no values predicition
+  Sensitivity <- confMat$byClass["Sensitivity"] # proportion of true yes values prediction or "Recall"
+  Precision <- confMat$byClass["Precision"] # proportion of true positivesout of all predicted positives
+  misclassification_rate <- (confMat$table[[2]]+confMat$table[[3]])/sum(confMat$table) # miss classification rate
+  return(as.list(c(specificity, Sensitivity, Precision, "misclassification_rate" =
+                     misclassification_rate)))
+}
+#D statistic
+d.stat <- function(pred, truth){
+  pred.cls <- as.numeric(pred > 0.5)
+  hx<-data.frame(pred.cls, truth)
+  hx.0 <- hx[hx$truth == 0,]
+  hx.1 <- hx[hx$truth == 1,]
+  d.stat <- mean(hx.1$pred.cls) - mean(hx.0$pred.cls)
+  paste("D static value is",d.stat," ")
+}
+
+
+#concordance discordance function
+ConcCalc<-function(predicted, truth){
+  # Get all actual observations and their fitted values into a frame
+  fitted<-data.frame(cbind(predicted, truth))
+  colnames(fitted)<-c('respvar','score')
+  # Subset only ones
+  ones<-fitted[fitted[,1]==1,]
+  # Subset only zeros
+  zeros<-fitted[fitted[,1]==0,]
+  
+  # Initialise all the values
+  pairs_tested<-nrow(ones)*nrow(zeros)
+  conc<-0
+  disc<-0
+  
+  # Get the values in a for-loop
+  for(i in 1:nrow(ones))
+  {
+    conc<-conc + sum(ones[i,"score"]>zeros[,"score"])
+    disc<-disc + sum(ones[i,"score"]<zeros[,"score"])
+  }
+  # Calculate concordance, discordance and ties
+  concordance<-conc/pairs_tested
+  discordance<-disc/pairs_tested
+  ties_perc<-(1-concordance-discordance)
+  return(list("Concordance"=concordance,
+              "Discordance"=discordance,
+              "Tied"=ties_per))
+}
+#3a and 3b in writeup
+#question no 3
+#qno.3.c
+bank <- read.csv("C:\\Users\\sanary\\Desktop\\bank-additional-full.csv", sep = ";")
+bank.data <- bank
+head(bank)
+sapply(bank, class)
+
+# change factor to numeric
+for(i in 1:ncol(bank)){
+  if(is.factor(bank[,i])){
+    bank[,i]<-as.numeric(bank[,i])
+  }
+}
+
+# parting the information to test and training
+bank$y[which(bank$y == 2)] <- 0 # convert the target variable to binary classification
+train <- createDataPartition(y = bank$y, p = 0.7, list = F)
+training.log <- bank[train.part,]
+test.log <- bank[-train.part,]
+
+formula = y ~ .
+m1 <- glm(formula, data = training.log, family = binomial)
+#confusion matrix
+pred <- predict(m1, test.log, type = "response")
+mydf <-as.data.frame(cbind(test.log$y,pred))
+mydf$response <- as.factor(ifelse(mydf$pred>0.5, 1, 0))
+confMat <- confusionMatrix(mydf$response,as.factor(mydf$V1))
+conf_metrics(confMat)
+#roc curve
+#ks statistic, #auc value
+plotROC(test.log$y, pred)
+# d ststistic
+d.stat(pred, test.log$y)
+#residual diagnsotics
+
+pearsonRes <-residuals(m1,type="pearson")
+devianceRes <-residuals(m1,type="deviance")
+rawRes <-residuals(m1,type="response")
+studentDevRes<-rstudent(m1)
+fv<-fitted(m1)
+
+#classification based on the probability
+training.log$y_pred<-as.numeric(m1$fitted.values>0.5)
+predVals <-  data.frame(trueVal=training.log$y, predClass=training.log$y_pred, predProb=fv, 
+                        rawRes, pearsonRes, devianceRes, studentDevRes)
+
+#trueVal equals 1, the residuals are positive; 
+#      otherwise, they they are negative
+
+plot(studentDevRes) 
+barplot(studentDevRes)
+
+#logisitic regression residuals 
+
+plot(predict(m1),residuals(m1))  #plot predicted value vs residuals
+abline(h=0,lty=2,col="black")
+
+plot(predict(m1),residuals(m1),col=c("green","blue")[1+training.log$y])
+abline(h=0,lty=2,col="red")
+
+#standard plots available for logistic regression
+plot(m1)
+#now let's look at leverage and influence
+barplot(cooks.distance(m1))
+influence.measures(m1)
+influencePlot(m1)
+vif(m1)
+
+#partitioning the data in 3:7 ratio
+train.part <- createDataPartition(y = bank.data$y, p = 0.7, list = F)
+training <- bank.data[train.part,]
+test <- bank.data[-train.part,]
+
+
+#decisiontree
+set.seed(1000)
+rpart.tree <- rpart(formula, training)
+rpart.plot(rpart.tree, extra = 5)
+table(test$y,predict(rpart.tree,test, type = "class"))
+confMat <- confusionMatrix(predict(rpart.tree,test, type = "class"), test$y)
+conf_metrics(confMat)
+#validating decision tree
+printcp(rpart.tree)
+plotcp(rpart.tree)
+#The value of cp should be least, so that the cross-validated error rate is minimum.
+# the minimum value of cross validated error gives the optimal decision tree
+ptree<- prune(rpart.tree,rpart.tree$cptable[(which.min(rpart.tree$cptable[,"xerror"])),"CP"])
+fancyRpartPlot(ptree, uniform=TRUE,main="Pruned Classification Tree")
+
+# calculating missclassification rate
+#cnfusion matrix
+confMat.prune <- confusionMatrix(predict(ptree,test, type = "class"), test$y)
+conf_metrics(confMat.prune)
+#roc curve
+pred <- predict(ptree,test, probability = T)
+plotROC(test$y, pred[,2])
+
+#randomforeest # ntree variable indiactes how many trees wants to grow
+rf.fit <- randomForest(formula, data = training,ntree = 2000, importance = T)
+#importance of arttributes
+rf.fit$importance
+varImpPlot(rf.fit)
+##predict on testing data
+pred <- predict(rf.fit, newdata = test, type = 'prob')
+rf.conf <- confusionMatrix(predict(rf.fit, newdata = test),test$y)
+#confusion matrix
+conf_metrics(rf.conf)
+#roc ks statistic, auc
+plotROC(test$y, pred[,2])
+
+#q.no3d is in writeup
+#q.no 3.e
+#support vector machine
+#radial basis kernel
+set.seed(100)
+svmmodel<-svm(y~., data=training, method="C-classification",
+              kernel="radial", gamma = 0.01, cost = 100,cross=5, probability=TRUE)
+
+pred <- predict(svmmodel, newdata = test, type = "prob")
+pred <- predict(svmmodel, newdata = test, probability = T)
+confMat <- confusionMatrix(pred,test$y)
+#confusion matrix metrics
+conf_metrics(confMat)
+pred <- predict(svmmodel, newdata = test, probability = T)
+attributes(pred)$probabilities
+plotROC(test$y, attributes(pred)$probabilities[,2])
+
+#neural networks
+net.fit = nnet(formula, data=training, size = 21,MaxNWts=2000,maxit=10000,decay=.001)
+pred <- predict(net.fit, test, type = "class")
+confMat <- confusionMatrix(pred, test$y)
+conf_metrics(confMat)
+#roc ks and auc
+pred <- predict(net.fit, newdata = test, probability = T)
+plotROC(test$y, pred)
+#before using this visualization function make sure that load 'devtools' package and then download the below updated package
+source_url('https://gist.githubusercontent.com/fawda123/7471137/raw/466c1474d0a505ff044412703516c34f1a4684a5/nnet_plot_update.r')
+plot.nnet(net.fit)
+
