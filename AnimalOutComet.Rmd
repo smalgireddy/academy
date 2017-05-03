@@ -1,8 +1,3 @@
-#Final Project
-#Name: Tony Vo & Santhosh M Reddy
-#DSA 5103 Intelligent Data Analytics
-#Date: 12/10/2016
-
 ```{r}
 #libraries
 setwd("C:/Users/voton/Documents/R/DSA5103_Final")
